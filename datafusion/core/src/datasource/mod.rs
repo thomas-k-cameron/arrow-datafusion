@@ -46,7 +46,6 @@ use futures::StreamExt;
 /// Get all files as well as the file level summary statistics (no statistic for partition columns).
 /// If the optional `limit` is provided, includes only sufficient files.
 /// Needed to read up to `limit` number of rows.
-/// TODO fix case where `num_rows` and `total_byte_size` are not defined (stat should be None instead of Some(0))
 pub async fn get_statistics_with_limit(
     all_files: impl Stream<Item = Result<(PartitionedFile, Statistics)>>,
     file_schema: SchemaRef,
@@ -124,8 +123,20 @@ pub async fn get_statistics_with_limit(
     };
 
     let statistics = Statistics {
-        num_rows: Some(num_rows as usize),
-        total_byte_size: Some(total_byte_size as usize),
+        num_rows: {
+            if num_rows == 0 {
+                None
+            } else {
+                Some(num_rows as usize)
+            }
+        },
+        total_byte_size: {
+            if total_byte_size == 0 {
+                None
+            } else {
+                Some(num_rows as usize)
+            }
+        },
         column_statistics: column_stats,
         is_exact,
     };
