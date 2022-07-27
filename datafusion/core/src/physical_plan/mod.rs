@@ -94,8 +94,10 @@ pub use self::planner::PhysicalPlanner;
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Statistics {
     /// The number of table rows
+    /// None when value is not available
     pub num_rows: Option<usize>,
     /// total bytes of the table rows
+    /// None when the value is not available
     pub total_byte_size: Option<usize>,
     /// Statistics on a column level
     pub column_statistics: Option<Vec<ColumnStatistics>>,

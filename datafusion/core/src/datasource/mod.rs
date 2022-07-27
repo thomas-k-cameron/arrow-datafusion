@@ -62,12 +62,23 @@ pub async fn get_statistics_with_limit(
     let mut is_exact = true;
     // fusing the stream allows us to call next safely even once it is finished
     let mut all_files = Box::pin(all_files.fuse());
+    // flags for checking weather the num_rows/total_byte_size is ok
+    let mut is_num_rows_undef = false;
+    let mut is_total_byte_size_undef = false;
     while let Some(res) = all_files.next().await {
         let (file, file_stats) = res?;
+        
+        // statistics on num_rows
+        is_num_rows_undef = file_stats.num_rows.is_none();
+        num_rows += file_stats.num_rows.unwrap_or(0);
+        
+        // statistics on total_byte_size
+        is_total_byte_size_undef = file_stats.total_byte_size.is_none();
+        total_byte_size += file_stats.total_byte_size.unwrap_or(0);
+        
         result_files.push(file);
         is_exact &= file_stats.is_exact;
-        num_rows += file_stats.num_rows.unwrap_or(0);
-        total_byte_size += file_stats.total_byte_size.unwrap_or(0);
+        
         if let Some(vec) = &file_stats.column_statistics {
             has_statistics = true;
             for (i, cs) in vec.iter().enumerate() {
@@ -111,7 +122,23 @@ pub async fn get_statistics_with_limit(
         is_exact = false;
     }
 
-    let column_stats = if has_statistics {
+    let total_byte_size = {
+        if is_total_byte_size_undef {
+            Some(total_byte_size as usize)
+        } else {
+            None
+        }
+    };
+
+    let num_rows = {
+        if is_num_rows_undef {
+            Some(num_rows as usize)
+        } else {
+            None
+        }
+    };
+
+    let column_statistics = if has_statistics {
         Some(get_col_stats(
             &file_schema,
             null_counts,
@@ -121,23 +148,11 @@ pub async fn get_statistics_with_limit(
     } else {
         None
     };
-
+    
     let statistics = Statistics {
-        num_rows: {
-            if num_rows == 0 {
-                None
-            } else {
-                Some(num_rows as usize)
-            }
-        },
-        total_byte_size: {
-            if total_byte_size == 0 {
-                None
-            } else {
-                Some(num_rows as usize)
-            }
-        },
-        column_statistics: column_stats,
+        num_rows,
+        total_byte_size,
+        column_statistics,
         is_exact,
     };
 
